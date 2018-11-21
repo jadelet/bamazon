@@ -1,5 +1,6 @@
 var mysql = require("mysql");
 var inquirer = require("inquirer");
+var table = require('console.table');
 var connection = mysql.createConnection({
   host: "localhost",
   port: 3306,
@@ -10,30 +11,43 @@ var connection = mysql.createConnection({
 
 connection.connect(function(err) {
   if (err) throw err;
-  buy();
+start()
 });
 
+function start() {
+  inquirer
+    .prompt({
+      name: "start",
+      type: "rawlist",
+      message: "Would you like to [SHOP] for an item or [QUIT] bamazon?",
+      choices: ["SHOP", "QUIT"]
+    })
+  
+    .then(function(answer) {
+      // based on their answer, either call the bid or the post functions
+      if (answer.start.toUpperCase() === "SHOP") {
+        buy();
+      }
+      else {
+        quit();
+      }
+    });
 function buy() {
 
   connection.query("SELECT * FROM products", function(err, results) {
     if (err) throw err;
+    console.table(results);
     inquirer
       .prompt([
         {
           name: "choice",
-          type: "rawlist",
+          type: "list",
           choices: function() {
             var choiceArray = [];
            
             for (var i = 0; i < results.length; i++) {
-              var cost = JSON.stringify(results[i].price);
-              var product = JSON.stringify(results[i].product_name);
-              var department = JSON.stringify(results[i].department_name);
-              var salesEntry = (product + "|" + department + "|" + cost);
-          
-             
-            choiceArray.push(salesEntry)
-          
+                  
+            choiceArray.push(results[i].item_id.toString())
           }
           return choiceArray
         },
@@ -45,45 +59,52 @@ function buy() {
           message: "How many of this Product would you like to purchase?"
         }
       ])
-
       .then(function(answer) {
-        
+   
         var chosenProduct;
         for (var i = 0; i < results.length; i++) {
-          console.log(answer)
-          if (answer.choice.quantity >=  ) {
-
+          if (results[i].item_id == answer.choice) {
             chosenProduct = results[i];
           }
         }
 
-        if ( parseInt(chosenProduct.stock_quantity) < parseInt(quantity)) {
+        if ( parseInt(chosenProduct.stock_quantity) > parseInt(answer.quantity)) {
   
           connection.query(
             "UPDATE products SET ? WHERE ?",
             [
               {
-                stockquantity: parseInt(stock_quantity)-parseInt(quantity)
+                stock_quantity: parseInt(chosenProduct.stock_quantity)-parseInt(answer.quantity)
               },
               {
-                id: chosenProduct.id
+                item_id: chosenProduct.item_id
               }
             ],
          
-            function(error) {
-              if (error) throw err;
-              var totalCost= parseint(chosenProduct.quantity)*parseInt(chosenProduct.price)
-              var totalCostNJ= totalCost*1.07
-              console.log(`You have purchased ${quantity} ${chosenProduct.name}(s). Your total is ${totalCostNJ} including sales tax, assuming you come from NJ. Otherwise your total cost is ${totalCost}`);
+         
+          );
+
+            
+          
+       
+              var totalCost= parseInt(answer.quantity)*parseFloat(chosenProduct.price)
+              var totalCostNJ= "$"+ (totalCost*1.07).toFixed(2)
+              var totalCostOther="$" + totalCost.toFixed(2)
+              console.log(`You have purchased ${answer.quantity} ${chosenProduct.product_name}(s). Your total is ${totalCostNJ} including sales tax, assuming you come from NJ. Otherwise your total cost is ${totalCostOther}`);
               start();
            
-            });
+            
         }
         else {
         
           console.log("I'm afraid we don't have sufficient stock to fulfill your request, please select another Product or smaller quantity.");
-          start();
+         start();
         }
       });
     })
   }
+  function quit() {
+    console.log ("Thank you for shopping, come again soon!"); 
+    process.exit(0);
+  }
+}
